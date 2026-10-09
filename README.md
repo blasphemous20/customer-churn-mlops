@@ -21,6 +21,7 @@ customer-churn-mlops/
 │   ├── preprocessing.py       # Feature preparation and preprocessing
 │   └── train.py               # Train, evaluate, and register a model
 ├── .python-version            # Python version used by uv (3.14)
+├── Dockerfile                 # Container image for the Streamlit app
 ├── pyproject.toml             # Project metadata and dependencies
 ├── requirements.txt           # Pip dependency list
 └── uv.lock                    # Locked dependency versions
@@ -52,10 +53,10 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
 
 ### 1. Start the MLflow tracking server
 
-In a PowerShell terminal at the project root, start MLflow with the project's local SQLite database:
+In a PowerShell terminal at the project root, start MLflow with the project's local SQLite database. Binding to `0.0.0.0` makes it reachable from the app container; use this for local development only and apply appropriate firewall rules.
 
 ```powershell
-uv run mlflow server --backend-store-uri sqlite:///mlflow.db --host 127.0.0.1 --port 5000
+uv run mlflow server --backend-store-uri sqlite:///mlflow.db --host 0.0.0.0 --port 5000
 ```
 
 Open the MLflow interface at [http://127.0.0.1:5000](http://127.0.0.1:5000). Keep this terminal running while training or using the app.
@@ -91,6 +92,24 @@ uv run uvicorn be.api:app --reload --port 8001
 ```
 
 The API documentation is available at [http://localhost:8001/docs](http://localhost:8001/docs).
+
+## Run the Streamlit app in Docker
+
+Start MLflow and train/register the model as described above, then build the image from the project root:
+
+```powershell
+docker build -t customer-churn-mlops .
+```
+
+Run the app container and connect it to the MLflow server on the host:
+
+```powershell
+docker run --rm -p 8501:8501 `
+  -e MLFLOW_TRACKING_URI=http://host.docker.internal:5000 `
+  customer-churn-mlops
+```
+
+Open [http://localhost:8501](http://localhost:8501). On Linux, if `host.docker.internal` is not available, add `--add-host=host.docker.internal:host-gateway` to `docker run`. The container includes the app, source code, and dataset; the MLflow server and registered model remain external.
 
 ## Model and data notes
 
